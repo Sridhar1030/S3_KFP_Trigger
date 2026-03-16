@@ -1,0 +1,95 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: kfp-trigger-template
+  namespace: s3-kfp-trigger
+spec:
+  params:
+    - name: bucket
+      description: MinIO bucket name
+    - name: object_key
+      description: Object key (file path) within bucket
+    - name: event_name
+      description: Event type (e.g., s3:ObjectCreated:Put)
+      default: "s3:ObjectCreated:Put"
+    - name: event_time
+      description: Event timestamp
+      default: ""
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: TaskRun
+      metadata:
+        generateName: kfp-trigger-
+        namespace: s3-kfp-trigger
+      spec:
+        serviceAccountName: kfp-trigger-sa
+        taskSpec:
+          params:
+            - name: s3_uri
+              description: Full S3 URI to the uploaded file
+          steps:
+            - name: trigger
+              image: python:3.9-slim
+              script: |
+                #!/bin/bash
+                set -e
+
+                echo "Installing dependencies..."
+                pip install --quiet --no-cache-dir kfp>=1.8.0 kubernetes>=25.0.0 pyyaml>=6.0 requests>=2.31.0
+
+                echo "Triggering pipeline for S3 URI: $(params.s3_uri)"
+                python /scripts/trigger_pipeline.py --s3-uri "$(params.s3_uri)"
+
+              env:
+                # KFP API endpoint (RHOAI default)
+                - name: KFP_HOST
+                  value: "https://ds-pipeline-dspa.redhat-ods-applications.svc.cluster.local:8443"
+
+                # Pipeline mappings configuration path
+                - name: PIPELINE_MAPPINGS_PATH
+                  value: "/config/mappings.yaml"
+
+                # Current namespace
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+
+                # Log level
+                - name: LOG_LEVEL
+                  value: "INFO"
+
+              volumeMounts:
+                # Mount trigger script from ConfigMap
+                - name: scripts
+                  mountPath: /scripts
+
+                # Mount pipeline routing configuration
+                - name: config
+                  mountPath: /config
+
+              # Resource limits to prevent resource exhaustion
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+
+          volumes:
+            # Trigger script ConfigMap
+            - name: scripts
+              configMap:
+                name: trigger-scripts
+
+            # Pipeline routing configuration
+            - name: config
+              configMap:
+                name: pipeline-mappings
+
+        # Construct S3 URI from bucket and object_key params
+        params:
+          - name: s3_uri
+            value: "s3://$(tt.params.bucket)/$(tt.params.object_key)"

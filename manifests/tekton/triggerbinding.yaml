@@ -1,0 +1,23 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: minio-event-binding
+  namespace: s3-kfp-trigger
+spec:
+  params:
+    # Extract bucket name from MinIO webhook event
+    - name: bucket
+      value: $(body.Records[0].s3.bucket.name)
+
+    # Extract object key (file path) from MinIO webhook event
+    - name: object_key
+      value: $(body.Records[0].s3.object.key)
+
+    # Extract event name (e.g., s3:ObjectCreated:Put)
+    - name: event_name
+      value: $(body.Records[0].eventName)
+
+    # Extract event timestamp
+    - name: event_time
+      value: $(body.Records[0].eventTime)

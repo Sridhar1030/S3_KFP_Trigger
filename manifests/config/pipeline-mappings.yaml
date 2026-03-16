@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-mappings
+  namespace: s3-kfp-trigger
+data:
+  mappings.yaml: |
+    # Pipeline routing configuration
+    # Maps MinIO bucket path prefixes to Kubeflow pipeline names
+
+    routes: []
+    # Example route:
+    # - prefix: "ml-datasets/team-fraud/"
+    #   pipeline: "fraud-detection-training-v2"
+    #   namespace: "s3-kfp-trigger"
+    #   enabled: true
+    #   parameters:
+    #     model_type: "xgboost"

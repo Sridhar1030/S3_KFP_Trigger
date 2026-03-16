@@ -1,0 +1,14 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: minio-listener
+  namespace: s3-kfp-trigger
+spec:
+  serviceAccountName: kfp-trigger-sa
+  triggers:
+    - name: minio-webhook
+      bindings:
+        - ref: minio-event-binding
+      template:
+        ref: kfp-trigger-template
