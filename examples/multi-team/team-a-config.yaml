@@ -1,0 +1,116 @@
+---
+# Team A (Fraud Detection) - Pipeline Mapping Configuration
+#
+# This is an example configuration for Team A (Fraud Detection team)
+# demonstrating how to configure automatic pipeline triggering for a specific team.
+#
+# Usage:
+#   1. Customize the values below for your team
+#   2. Merge this into the main pipeline-mappings ConfigMap
+#   3. Upload fraud detection data to: s3://ml-datasets/team-fraud/
+#
+# Team Details:
+#   - Team: Fraud Detection
+#   - Namespace: fraud-team (or s3-kfp-trigger for shared namespace)
+#   - Pipeline: fraud-detection-training-v2
+#   - Bucket Path: ml-datasets/team-fraud/
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-mappings-team-a
+  namespace: s3-kfp-trigger
+  labels:
+    team: fraud-detection
+    managed-by: team-a
+data:
+  mappings.yaml: |
+    routes:
+      # Production fraud detection pipeline (highest priority)
+      - prefix: "ml-datasets/team-fraud/production/"
+        pipeline: "fraud-detection-production-v3"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          environment: "production"
+          model_type: "xgboost"
+          validation_split: "0.2"
+          enable_monitoring: "true"
+          alert_threshold: "0.95"
+
+      # Staging/testing fraud detection pipeline
+      - prefix: "ml-datasets/team-fraud/staging/"
+        pipeline: "fraud-detection-staging-v2"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          environment: "staging"
+          model_type: "xgboost"
+          validation_split: "0.3"
+          enable_monitoring: "false"
+
+      # Development/experimental fraud detection pipeline
+      - prefix: "ml-datasets/team-fraud/dev/"
+        pipeline: "fraud-detection-dev-v1"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          environment: "development"
+          model_type: "random_forest"  # Experimenting with different model
+          validation_split: "0.2"
+          enable_monitoring: "false"
+
+      # Default fraud team route (catches all team-fraud uploads)
+      - prefix: "ml-datasets/team-fraud/"
+        pipeline: "fraud-detection-training-v2"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          environment: "default"
+          model_type: "xgboost"
+          validation_split: "0.2"
+          epochs: "100"
+          learning_rate: "0.01"
+
+---
+# Example MinIO bucket structure for Team A:
+#
+# ml-datasets/
+# └── team-fraud/
+#     ├── production/
+#     │   ├── transactions-2026-03-16.csv  → fraud-detection-production-v3
+#     │   └── transactions-2026-03-17.csv  → fraud-detection-production-v3
+#     ├── staging/
+#     │   └── test-data-2026-03-16.csv     → fraud-detection-staging-v2
+#     ├── dev/
+#     │   └── experiment-data.csv          → fraud-detection-dev-v1
+#     └── historical-data.csv              → fraud-detection-training-v2 (default)
+#
+# Routing Examples:
+# - s3://ml-datasets/team-fraud/production/data.csv → fraud-detection-production-v3
+# - s3://ml-datasets/team-fraud/staging/data.csv    → fraud-detection-staging-v2
+# - s3://ml-datasets/team-fraud/dev/data.csv        → fraud-detection-dev-v1
+# - s3://ml-datasets/team-fraud/any-file.csv        → fraud-detection-training-v2
+
+---
+# Integration Instructions:
+#
+# To integrate this team configuration into the main pipeline-mappings ConfigMap:
+#
+# 1. Extract the routes section from this file
+# 2. Merge into manifests/config/pipeline-mappings.yaml
+# 3. Apply the ConfigMap:
+#    oc apply -f manifests/config/pipeline-mappings.yaml
+#
+# 4. Verify the routes:
+#    oc get configmap pipeline-mappings -n s3-kfp-trigger -o yaml
+#
+# 5. Test the routing:
+#    mc cp test-fraud-data.csv local/ml-datasets/team-fraud/production/data.csv
+#    oc logs -n s3-kfp-trigger -l tekton.dev/task=trigger-kfp-pipeline --tail=50
+#
+# Maintenance:
+# - To disable a route temporarily: Set enabled: false
+# - To add a new environment: Add a new route with more specific prefix
+# - To change parameters: Update the parameters section and reapply ConfigMap
+# - Pipeline runs are NOT affected by ConfigMap changes (only new triggers)

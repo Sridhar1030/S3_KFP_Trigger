@@ -1,0 +1,59 @@
+---
+# DataSciencePipelinesApplication - KFP Pipeline Server Configuration
+# This creates a Kubeflow Pipelines instance in the s3-kfp-trigger namespace
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: pipelines
+  namespace: s3-kfp-trigger
+spec:
+  # Object storage configuration (MinIO)
+  objectStorage:
+    externalStorage:
+      # MinIO S3-compatible endpoint
+      host: "minio.minio.svc.cluster.local"
+      port: "9000"
+
+      # Bucket for storing pipeline artifacts
+      bucket: "kfp-pipelines"
+
+      # Region (can be any value for MinIO)
+      region: "us-east-1"
+
+      # Scheme - use "http" for internal MinIO, "https" for production
+      scheme: "http"
+
+      # S3 credentials secret reference
+      s3CredentialsSecret:
+        secretName: "minio-kfp-secret"
+        accessKey: "AWS_ACCESS_KEY_ID"
+        secretKey: "AWS_SECRET_ACCESS_KEY"
+
+  # Database configuration (uses default MySQL)
+  database:
+    mariaDB:
+      pipelineDBName: "mlpipeline"
+
+      # Storage for database
+      pvcSize: "10Gi"
+
+  # Persistence agent configuration
+  persistenceAgent:
+    deploy: true
+
+  # Scheduled workflow controller
+  scheduledWorkflow:
+    deploy: true
+---
+# Secret for MinIO credentials
+# Replace with your actual MinIO access credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-kfp-secret
+  namespace: s3-kfp-trigger
+type: Opaque
+stringData:
+  # REPLACE THESE WITH YOUR ACTUAL MINIO CREDENTIALS
+  AWS_ACCESS_KEY_ID: "minio"
+  AWS_SECRET_ACCESS_KEY: "minio123"

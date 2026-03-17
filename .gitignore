@@ -4,7 +4,7 @@ specs/
 .specify/memory/
 CLAUDE.md
 .specify/memory/constitution.md
-
+.venv/
 # Python
 __pycache__/
 *.py[cod]

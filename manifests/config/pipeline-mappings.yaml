@@ -8,12 +8,56 @@ data:
   mappings.yaml: |
     # Pipeline routing configuration
     # Maps MinIO bucket path prefixes to Kubeflow pipeline names
+    #
+    # Routing uses longest-prefix-match algorithm:
+    # - Routes are matched from most specific to least specific
+    # - First matching route (by longest prefix) is selected
+    # - Disabled routes (enabled: false) are skipped
+    #
+    # Example: s3://ml-datasets/team-fraud/production/data.csv
+    # Will match "ml-datasets/team-fraud/production/" if exists,
+    # else "ml-datasets/team-fraud/", else "ml-datasets/"
 
-    routes: []
-    # Example route:
-    # - prefix: "ml-datasets/team-fraud/"
-    #   pipeline: "fraud-detection-training-v2"
-    #   namespace: "s3-kfp-trigger"
-    #   enabled: true
-    #   parameters:
-    #     model_type: "xgboost"
+    routes:
+      # Team-specific routes (highest priority - most specific prefixes)
+      # Team Fraud Detection
+      - prefix: "ml-datasets/team-fraud/"
+        pipeline: "fraud-detection-training-v2"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          model_type: "xgboost"
+          validation_split: "0.2"
+
+      # Team Recommender System
+      - prefix: "ml-datasets/team-recommender/"
+        pipeline: "recommender-training-v1"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "collaborative_filtering"
+          embedding_size: "128"
+
+      # Team NLP/Text Processing
+      - prefix: "ml-datasets/team-nlp/"
+        pipeline: "nlp-model-training-v3"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          model_type: "transformer"
+          max_length: "512"
+
+      # Default fallback route (lowest priority - catches all ml-datasets uploads)
+      # This will match any uploads to ml-datasets/ that don't match team-specific routes
+      - prefix: "ml-datasets/"
+        pipeline: "sample-pipeline"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters: {}
+
+    # Notes:
+    # - All prefix values MUST end with '/'
+    # - Required fields: prefix, pipeline, namespace
+    # - Optional fields: enabled (default: true), parameters (default: {})
+    # - To add a new team, insert route BEFORE the default fallback route
+    # - To disable a route temporarily, set enabled: false (don't delete)

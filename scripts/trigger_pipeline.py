@@ -48,12 +48,94 @@ def load_config(config_path: str) -> Dict[str, Any]:
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
-    if not config or 'routes' not in config:
-        raise ValueError(
-            f"Invalid configuration: 'routes' key not found in {config_path}"
-        )
+    if not config:
+        raise ValueError(f"Empty or invalid YAML in {config_path}")
+
+    # Validate configuration schema
+    validate_config_schema(config)
 
     return config
+
+
+def validate_route(route: Dict[str, Any]) -> tuple[bool, str]:
+    """
+    Validate pipeline route configuration.
+
+    Args:
+        route: Route dictionary from configuration
+
+    Returns:
+        Tuple of (is_valid, error_message)
+        - (True, "") if valid
+        - (False, "error message") if invalid
+
+    Example:
+        >>> route = {'prefix': 'ml-datasets/team-fraud/', 'pipeline': 'fraud-v2', 'namespace': 'fraud-team'}
+        >>> valid, error = validate_route(route)
+        >>> valid
+        True
+    """
+    # Check required fields
+    if not route.get('prefix'):
+        return False, "Route missing required field: 'prefix'"
+
+    if not route.get('pipeline'):
+        return False, "Route missing required field: 'pipeline'"
+
+    if not route.get('namespace'):
+        return False, "Route missing required field: 'namespace'"
+
+    # Validate prefix format (should end with / for directory-style matching)
+    prefix = route['prefix']
+    if not prefix.endswith('/'):
+        return False, f"Route prefix must end with '/': {prefix}"
+
+    # Validate enabled field if present
+    if 'enabled' in route and not isinstance(route['enabled'], bool):
+        return False, f"Route 'enabled' field must be boolean, got: {type(route['enabled']).__name__}"
+
+    # Validate parameters field if present
+    if 'parameters' in route and not isinstance(route['parameters'], dict):
+        return False, f"Route 'parameters' field must be dict, got: {type(route['parameters']).__name__}"
+
+    return True, ""
+
+
+def validate_config_schema(config: Dict[str, Any]) -> None:
+    """
+    Validate pipeline routing configuration schema.
+
+    Args:
+        config: Configuration dictionary from load_config()
+
+    Raises:
+        ValueError: If configuration schema is invalid
+
+    Example:
+        >>> config = {'routes': [{'prefix': 'ml-datasets/', 'pipeline': 'default', 'namespace': 'default'}]}
+        >>> validate_config_schema(config)  # No exception raised
+    """
+    if not isinstance(config, dict):
+        raise ValueError(f"Configuration must be a dictionary, got: {type(config).__name__}")
+
+    if 'routes' not in config:
+        raise ValueError("Configuration missing required field: 'routes'")
+
+    routes = config['routes']
+    if not isinstance(routes, list):
+        raise ValueError(f"'routes' must be a list, got: {type(routes).__name__}")
+
+    if len(routes) == 0:
+        raise ValueError("'routes' list cannot be empty - at least one route required")
+
+    # Validate each route
+    for idx, route in enumerate(routes):
+        if not isinstance(route, dict):
+            raise ValueError(f"Route {idx} must be a dictionary, got: {type(route).__name__}")
+
+        valid, error = validate_route(route)
+        if not valid:
+            raise ValueError(f"Route {idx} validation failed: {error}")
 
 
 def find_route(s3_uri: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:

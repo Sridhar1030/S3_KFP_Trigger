@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sample Kubeflow Pipeline for MinIO-triggered ML workflows.
+Sample Kubeflow Pipeline for MinIO-triggered ML workflows (KFP v1).
 
 This pipeline demonstrates the minimal contract for automatic triggering:
 - Accepts s3_uri parameter (required)
@@ -14,96 +14,94 @@ Usage:
 from kfp import dsl
 
 
-@dsl.component(
-    base_image='python:3.9-slim',
-    packages_to_install=['boto3']
-)
-def print_s3_info(s3_uri: str):
+def print_s3_info_op(s3_uri: str):
     """
     Simple component that prints S3 URI information.
-
-    In a real pipeline, this would load and process data from MinIO.
 
     Args:
         s3_uri: Full S3 URI (e.g., s3://ml-datasets/team-fraud/data.csv)
     """
-    import os
+    return dsl.ContainerOp(
+        name='print-s3-info',
+        image='python:3.9-slim',
+        command=['python', '-c'],
+        arguments=['''
+import os
 
-    print("=" * 60)
-    print("MinIO-Triggered Pipeline Execution")
-    print("=" * 60)
-    print(f"Processing data from: {s3_uri}")
-    print()
+s3_uri = "{}"
 
-    # Parse S3 URI
-    if s3_uri.startswith('s3://'):
-        uri_parts = s3_uri[5:].split('/', 1)
-        bucket = uri_parts[0]
-        object_key = uri_parts[1] if len(uri_parts) > 1 else ''
+print("=" * 60)
+print("MinIO-Triggered Pipeline Execution")
+print("=" * 60)
+print(f"Processing data from: {{s3_uri}}")
+print()
 
-        print(f"Bucket: {bucket}")
-        print(f"Object Key: {object_key}")
-    else:
-        print(f"WARNING: Invalid S3 URI format: {s3_uri}")
+# Parse S3 URI
+if s3_uri.startswith("s3://"):
+    uri_parts = s3_uri[5:].split("/", 1)
+    bucket = uri_parts[0]
+    object_key = uri_parts[1] if len(uri_parts) > 1 else ""
 
-    print()
-    print("MinIO credentials should be available as environment variables:")
-    print(f"- AWS_S3_ENDPOINT: {os.getenv('AWS_S3_ENDPOINT', 'NOT SET')}")
-    print(f"- AWS_ACCESS_KEY_ID: {'SET' if os.getenv('AWS_ACCESS_KEY_ID') else 'NOT SET'}")
-    print(f"- AWS_SECRET_ACCESS_KEY: {'SET' if os.getenv('AWS_SECRET_ACCESS_KEY') else 'NOT SET'}")
-    print()
-    print("Pipeline execution complete!")
-    print("=" * 60)
+    print(f"Bucket: {{bucket}}")
+    print(f"Object Key: {{object_key}}")
+else:
+    print(f"WARNING: Invalid S3 URI format: {{s3_uri}}")
+
+print()
+print("Pipeline execution complete!")
+print("=" * 60)
+'''.format(s3_uri)]
+    )
 
 
-@dsl.component(
-    base_image='python:3.9-slim',
-    packages_to_install=['pandas']
-)
-def simulate_data_processing(s3_uri: str) -> str:
+def simulate_data_processing_op(s3_uri: str):
     """
     Simulate data processing step.
 
     Args:
         s3_uri: S3 URI to process
-
-    Returns:
-        Processing result message
     """
-    import time
+    return dsl.ContainerOp(
+        name='simulate-processing',
+        image='python:3.9-slim',
+        command=['python', '-c'],
+        arguments=['''
+import time
 
-    print(f"[Data Processing] Starting processing for: {s3_uri}")
+s3_uri = "{}"
 
-    # Simulate processing time
-    time.sleep(2)
+print(f"[Data Processing] Starting processing for: {{s3_uri}}")
 
-    result = f"Successfully processed data from {s3_uri}"
-    print(f"[Data Processing] {result}")
+# Simulate processing time
+time.sleep(2)
 
-    return result
+result = f"Successfully processed data from {{s3_uri}}"
+print(f"[Data Processing] {{result}}")
+'''.format(s3_uri)]
+    )
 
 
-@dsl.component(
-    base_image='python:3.9-slim'
-)
-def log_completion(processing_result: str):
+def log_completion_op():
     """
     Log pipeline completion.
-
-    Args:
-        processing_result: Result from previous processing step
     """
-    print("=" * 60)
-    print("[Pipeline Complete]")
-    print(f"Result: {processing_result}")
-    print("=" * 60)
+    return dsl.ContainerOp(
+        name='log-completion',
+        image='python:3.9-slim',
+        command=['python', '-c'],
+        arguments=['''
+print("=" * 60)
+print("[Pipeline Complete]")
+print("=" * 60)
+''']
+    )
 
 
 @dsl.pipeline(
-    name='MinIO Trigger Test Pipeline',
+    name='sample-pipeline',
     description='Sample pipeline triggered automatically by MinIO file uploads'
 )
-def sample_trigger_pipeline(s3_uri: str):
+def sample_trigger_pipeline(s3_uri: str = 's3://ml-datasets/default.csv'):
     """
     Sample ML pipeline triggered by MinIO upload events.
 
@@ -118,14 +116,14 @@ def sample_trigger_pipeline(s3_uri: str):
                       Example: s3://ml-datasets/team-fraud/training-2026-03-16.csv
     """
     # Step 1: Print S3 information
-    print_task = print_s3_info(s3_uri=s3_uri)
+    print_task = print_s3_info_op(s3_uri)
 
     # Step 2: Simulate data processing
-    process_task = simulate_data_processing(s3_uri=s3_uri)
+    process_task = simulate_data_processing_op(s3_uri)
     process_task.after(print_task)
 
     # Step 3: Log completion
-    complete_task = log_completion(processing_result=process_task.output)
+    complete_task = log_completion_op()
     complete_task.after(process_task)
 
 

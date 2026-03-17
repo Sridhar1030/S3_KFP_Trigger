@@ -1,0 +1,118 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: sample-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.22, pipelines.kubeflow.org/pipeline_compilation_time: '2026-03-16T18:25:28.665037',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Sample pipeline triggered
+      automatically by MinIO file uploads", "inputs": [{"default": "s3://ml-datasets/default.csv",
+      "description": "S3 URI to uploaded file\nFormat: s3://bucket-name/path/to/file.csv\nExample:
+      s3://ml-datasets/team-fraud/training-2026-03-16.csv", "name": "s3_uri", "optional":
+      true, "type": "String"}], "name": "sample-pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.22}
+spec:
+  entrypoint: sample-pipeline
+  templates:
+  - name: log-completion
+    container:
+      args:
+      - |2
+
+        print("=" * 60)
+        print("[Pipeline Complete]")
+        print("=" * 60)
+      command: [python, -c]
+      image: python:3.9-slim
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+  - name: print-s3-info
+    container:
+      args:
+      - |2
+
+        import os
+
+        s3_uri = "{{inputs.parameters.s3_uri}}"
+
+        print("=" * 60)
+        print("MinIO-Triggered Pipeline Execution")
+        print("=" * 60)
+        print(f"Processing data from: {s3_uri}")
+        print()
+
+        # Parse S3 URI
+        if s3_uri.startswith("s3://"):
+            uri_parts = s3_uri[5:].split("/", 1)
+            bucket = uri_parts[0]
+            object_key = uri_parts[1] if len(uri_parts) > 1 else ""
+
+            print(f"Bucket: {bucket}")
+            print(f"Object Key: {object_key}")
+        else:
+            print(f"WARNING: Invalid S3 URI format: {s3_uri}")
+
+        print()
+        print("Pipeline execution complete!")
+        print("=" * 60)
+      command: [python, -c]
+      image: python:3.9-slim
+    inputs:
+      parameters:
+      - {name: s3_uri}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+  - name: sample-pipeline
+    inputs:
+      parameters:
+      - {name: s3_uri}
+    dag:
+      tasks:
+      - name: log-completion
+        template: log-completion
+        dependencies: [simulate-processing]
+      - name: print-s3-info
+        template: print-s3-info
+        arguments:
+          parameters:
+          - {name: s3_uri, value: '{{inputs.parameters.s3_uri}}'}
+      - name: simulate-processing
+        template: simulate-processing
+        dependencies: [print-s3-info]
+        arguments:
+          parameters:
+          - {name: s3_uri, value: '{{inputs.parameters.s3_uri}}'}
+  - name: simulate-processing
+    container:
+      args:
+      - |2
+
+        import time
+
+        s3_uri = "{{inputs.parameters.s3_uri}}"
+
+        print(f"[Data Processing] Starting processing for: {s3_uri}")
+
+        # Simulate processing time
+        time.sleep(2)
+
+        result = f"Successfully processed data from {s3_uri}"
+        print(f"[Data Processing] {result}")
+      command: [python, -c]
+      image: python:3.9-slim
+    inputs:
+      parameters:
+      - {name: s3_uri}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+  arguments:
+    parameters:
+    - {name: s3_uri, value: 's3://ml-datasets/default.csv'}
+  serviceAccountName: pipeline-runner

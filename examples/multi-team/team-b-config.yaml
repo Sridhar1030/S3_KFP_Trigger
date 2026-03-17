@@ -1,0 +1,148 @@
+---
+# Team B (Recommender System) - Pipeline Mapping Configuration
+#
+# This is an example configuration for Team B (Recommender System team)
+# demonstrating how to configure automatic pipeline triggering for a specific team.
+#
+# Usage:
+#   1. Customize the values below for your team
+#   2. Merge this into the main pipeline-mappings ConfigMap
+#   3. Upload recommender data to: s3://ml-datasets/team-recommender/
+#
+# Team Details:
+#   - Team: Recommender System
+#   - Namespace: recommender-team (or s3-kfp-trigger for shared namespace)
+#   - Pipeline: recommender-training-v1
+#   - Bucket Path: ml-datasets/team-recommender/
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-mappings-team-b
+  namespace: s3-kfp-trigger
+  labels:
+    team: recommender
+    managed-by: team-b
+data:
+  mappings.yaml: |
+    routes:
+      # User-based collaborative filtering pipeline
+      - prefix: "ml-datasets/team-recommender/user-based/"
+        pipeline: "recommender-user-cf-v2"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "user_based_collaborative_filtering"
+          similarity_metric: "cosine"
+          num_neighbors: "50"
+          embedding_size: "128"
+
+      # Item-based collaborative filtering pipeline
+      - prefix: "ml-datasets/team-recommender/item-based/"
+        pipeline: "recommender-item-cf-v2"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "item_based_collaborative_filtering"
+          similarity_metric: "pearson"
+          num_neighbors: "100"
+          embedding_size: "256"
+
+      # Deep learning recommendation pipeline (e.g., neural collaborative filtering)
+      - prefix: "ml-datasets/team-recommender/deep-learning/"
+        pipeline: "recommender-deep-learning-v1"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "neural_collaborative_filtering"
+          embedding_size: "512"
+          hidden_layers: "3"
+          dropout_rate: "0.2"
+          epochs: "50"
+
+      # A/B testing pipeline for recommender experiments
+      - prefix: "ml-datasets/team-recommender/ab-testing/"
+        pipeline: "recommender-ab-test-v1"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "hybrid"
+          test_group: "variant_b"
+          baseline_model: "user_based_cf"
+          variant_model: "deep_learning"
+
+      # Default recommender team route
+      - prefix: "ml-datasets/team-recommender/"
+        pipeline: "recommender-training-v1"
+        namespace: "s3-kfp-trigger"
+        enabled: true
+        parameters:
+          algorithm: "collaborative_filtering"
+          embedding_size: "128"
+          regularization: "0.01"
+          learning_rate: "0.001"
+
+---
+# Example MinIO bucket structure for Team B:
+#
+# ml-datasets/
+# └── team-recommender/
+#     ├── user-based/
+#     │   ├── user-interactions-2026-03-16.csv   → recommender-user-cf-v2
+#     │   └── user-profiles-2026-03-16.csv       → recommender-user-cf-v2
+#     ├── item-based/
+#     │   ├── item-features-2026-03-16.csv       → recommender-item-cf-v2
+#     │   └── item-interactions-2026-03-16.csv   → recommender-item-cf-v2
+#     ├── deep-learning/
+#     │   └── interaction-matrix-2026-03-16.csv  → recommender-deep-learning-v1
+#     ├── ab-testing/
+#     │   └── ab-test-data-2026-03-16.csv        → recommender-ab-test-v1
+#     └── general-training-data.csv              → recommender-training-v1 (default)
+#
+# Routing Examples:
+# - s3://ml-datasets/team-recommender/user-based/data.csv        → recommender-user-cf-v2
+# - s3://ml-datasets/team-recommender/item-based/data.csv        → recommender-item-cf-v2
+# - s3://ml-datasets/team-recommender/deep-learning/data.csv     → recommender-deep-learning-v1
+# - s3://ml-datasets/team-recommender/ab-testing/data.csv        → recommender-ab-test-v1
+# - s3://ml-datasets/team-recommender/any-file.csv               → recommender-training-v1
+
+---
+# Integration Instructions:
+#
+# To integrate this team configuration into the main pipeline-mappings ConfigMap:
+#
+# 1. Extract the routes section from this file
+# 2. Merge into manifests/config/pipeline-mappings.yaml
+# 3. Ensure team-recommender routes are placed BEFORE the default ml-datasets/ route
+# 4. Apply the ConfigMap:
+#    oc apply -f manifests/config/pipeline-mappings.yaml
+#
+# 5. Verify the routes:
+#    oc get configmap pipeline-mappings -n s3-kfp-trigger -o yaml
+#    oc describe configmap pipeline-mappings -n s3-kfp-trigger
+#
+# 6. Test the routing:
+#    # Test user-based CF route
+#    mc cp user-data.csv local/ml-datasets/team-recommender/user-based/interactions.csv
+#
+#    # Test item-based CF route
+#    mc cp item-data.csv local/ml-datasets/team-recommender/item-based/features.csv
+#
+#    # Verify TaskRuns created
+#    oc get taskruns -n s3-kfp-trigger | grep kfp-trigger
+#
+#    # Check logs
+#    oc logs -n s3-kfp-trigger -l tekton.dev/task=trigger-kfp-pipeline --tail=100
+#
+# Multi-Team Isolation:
+# - Team A (fraud) and Team B (recommender) routes are independent
+# - No overlap between team-fraud/ and team-recommender/ prefixes
+# - Each team can manage their subdirectory structure independently
+# - Longest-prefix-match ensures correct routing even with nested paths
+#
+# Best Practices:
+# - Use descriptive pipeline names (include version: v1, v2, etc.)
+# - Keep parameters documented (add comments for non-obvious values)
+# - Test new routes in dev/staging before production
+# - Monitor pipeline runs after ConfigMap changes
+# - Use enabled: false to disable routes instead of deleting them

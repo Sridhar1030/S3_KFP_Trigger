@@ -35,11 +35,16 @@ spec:
                 #!/bin/bash
                 set -e
 
+                # Set HOME for pip --user installation
+                export HOME=/tmp
+                export PATH=$PATH:/tmp/.local/bin
+
                 echo "Installing dependencies..."
-                pip install --quiet --no-cache-dir kfp>=1.8.0 kubernetes>=25.0.0 pyyaml>=6.0 requests>=2.31.0
+                python3 -m pip install --user --quiet --no-cache-dir kfp==1.8.22 kubernetes==25.3.0 pyyaml==6.0 requests==2.31.0
 
                 echo "Triggering pipeline for S3 URI: $(params.s3_uri)"
-                python /scripts/trigger_pipeline.py --s3-uri "$(params.s3_uri)"
+                cd /scripts
+                python3 trigger_pipeline.py --s3-uri "$(params.s3_uri)"
 
               env:
                 # KFP API endpoint (RHOAI default)
@@ -72,11 +77,11 @@ spec:
               # Resource limits to prevent resource exhaustion
               resources:
                 requests:
-                  memory: "64Mi"
-                  cpu: "50m"
-                limits:
-                  memory: "128Mi"
+                  memory: "256Mi"
                   cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "200m"
 
           volumes:
             # Trigger script ConfigMap
