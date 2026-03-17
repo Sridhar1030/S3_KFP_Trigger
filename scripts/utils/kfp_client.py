@@ -175,7 +175,11 @@ def trigger_pipeline(
         )
 
     # Build parameters
-    params = {'s3_uri': s3_uri}
+    # For hello-pipeline/TestPipeline compatibility, also pass as 'recipient'
+    params = {
+        's3_uri': s3_uri,
+        'recipient': s3_uri  # For pipelines that expect 'recipient' parameter
+    }
     if extra_params:
         params.update(extra_params)
 

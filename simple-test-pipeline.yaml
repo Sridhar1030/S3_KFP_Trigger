@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: simple-test-pipeline-
+  annotations:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+    pipelines.kubeflow.org/pipeline_compilation_time: '2026-03-17T10:30:00'
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Simple test pipeline triggered by MinIO", "inputs": [{"default": "s3://ml-datasets/default.csv", "name": "s3_uri", "type": "String"}], "name": "simple-test-pipeline"}'
+  labels:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+spec:
+  entrypoint: simple-test-pipeline
+  templates:
+  - name: simple-test-pipeline
+    inputs:
+      parameters:
+      - name: s3_uri
+        value: "s3://ml-datasets/default.csv"
+    dag:
+      tasks:
+      - name: print-s3-uri
+        template: print-s3-uri-template
+        arguments:
+          parameters:
+          - name: s3_uri
+            value: "{{inputs.parameters.s3_uri}}"
+
+  - name: print-s3-uri-template
+    inputs:
+      parameters:
+      - name: s3_uri
+    container:
+      image: python:3.9-slim
+      command: [python, -c]
+      args:
+      - |
+        import sys
+        s3_uri = "{{inputs.parameters.s3_uri}}"
+
+        print("=" * 60)
+        print("🚀 MinIO-Triggered Pipeline Execution")
+        print("=" * 60)
+        print(f"Processing data from: {s3_uri}")
+        print("")
+
+        # Parse S3 URI
+        if s3_uri.startswith("s3://"):
+            uri_parts = s3_uri[5:].split("/", 1)
+            bucket = uri_parts[0]
+            object_key = uri_parts[1] if len(uri_parts) > 1 else ""
+
+            print(f"📦 Bucket: {bucket}")
+            print(f"📄 Object Key: {object_key}")
+        else:
+            print(f"⚠️  WARNING: Invalid S3 URI format: {s3_uri}")
+
+        print("")
+        print("✅ Pipeline execution complete!")
+        print("=" * 60)
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.22
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+
+  arguments:
+    parameters:
+    - name: s3_uri
+      value: "s3://ml-datasets/default.csv"
+
+  serviceAccountName: pipeline-runner-dspa

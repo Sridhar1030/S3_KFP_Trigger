@@ -50,7 +50,7 @@ data:
       # Default fallback route (lowest priority - catches all ml-datasets uploads)
       # This will match any uploads to ml-datasets/ that don't match team-specific routes
       - prefix: "ml-datasets/"
-        pipeline: "sample-pipeline"
+        pipeline: "TestPipeline"
         namespace: "s3-kfp-trigger"
         enabled: true
         parameters: {}

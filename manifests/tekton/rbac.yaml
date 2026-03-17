@@ -34,6 +34,10 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
+  # Permissions to access DSPA API via oauth-proxy (port 8443)
+  - apiGroups: ["datasciencepipelinesapplications.opendatahub.io"]
+    resources: ["datasciencepipelinesapplications", "datasciencepipelinesapplications/api"]
+    verbs: ["get", "create", "list", "update", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

@@ -30,51 +30,38 @@ spec:
               description: Full S3 URI to the uploaded file
           steps:
             - name: trigger
-              image: python:3.9-slim
+              image: python:3.11-slim
               script: |
                 #!/bin/bash
                 set -e
 
-                # Set HOME for pip --user installation
                 export HOME=/tmp
                 export PATH=$PATH:/tmp/.local/bin
 
-                echo "Installing dependencies..."
-                python3 -m pip install --user --quiet --no-cache-dir kfp==1.8.22 kubernetes==25.3.0 pyyaml==6.0 requests==2.31.0
+                echo "Installing pyyaml..."
+                python3 -m pip install --user --quiet --no-cache-dir pyyaml
 
                 echo "Triggering pipeline for S3 URI: $(params.s3_uri)"
-                cd /scripts
-                python3 trigger_pipeline.py --s3-uri "$(params.s3_uri)"
+                python3 /scripts/trigger_pipeline.py --s3-uri "$(params.s3_uri)"
 
               env:
-                # KFP API endpoint (RHOAI default)
                 - name: KFP_HOST
-                  value: "https://ds-pipeline-dspa.redhat-ods-applications.svc.cluster.local:8443"
+                  value: "https://ds-pipeline-dspa.s3-kfp-trigger.svc.cluster.local:8443"
 
-                # Pipeline mappings configuration path
                 - name: PIPELINE_MAPPINGS_PATH
                   value: "/config/mappings.yaml"
 
-                # Current namespace
                 - name: NAMESPACE
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
 
-                # Log level
-                - name: LOG_LEVEL
-                  value: "INFO"
-
               volumeMounts:
-                # Mount trigger script from ConfigMap
                 - name: scripts
                   mountPath: /scripts
-
-                # Mount pipeline routing configuration
                 - name: config
                   mountPath: /config
 
-              # Resource limits to prevent resource exhaustion
               resources:
                 requests:
                   memory: "256Mi"
@@ -84,17 +71,13 @@ spec:
                   cpu: "200m"
 
           volumes:
-            # Trigger script ConfigMap
             - name: scripts
               configMap:
                 name: trigger-scripts
-
-            # Pipeline routing configuration
             - name: config
               configMap:
                 name: pipeline-mappings
 
-        # Construct S3 URI from bucket and object_key params
         params:
           - name: s3_uri
             value: "s3://$(tt.params.bucket)/$(tt.params.object_key)"
