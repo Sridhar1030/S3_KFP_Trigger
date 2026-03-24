@@ -1,0 +1,6 @@
+id,name,score,category
+1,Alice,92.5,training
+2,Bob,87.3,training
+3,Charlie,95.1,validation
+4,Diana,78.9,training
+5,Eve,91.0,validation
